@@ -54,26 +54,116 @@ export function stripJsonComments(text: string): string {
 }
 
 /**
+ * Drop a comma that directly precedes `}` or `]`, outside strings. tsconfig
+ * is parsed leniently by TypeScript, so trailing commas are common - and one
+ * of them made JSON.parse reject the whole file, silently losing every alias.
+ */
+export function stripTrailingCommas(text: string): string {
+    let out = '';
+    let inString = false;
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (inString) {
+            out += c;
+            if (c === '\\') { out += text[i + 1] ?? ''; i++; continue; }
+            if (c === '"') inString = false;
+            continue;
+        }
+        if (c === '"') { inString = true; out += c; continue; }
+        if (c === ',') {
+            let j = i + 1;
+            while (j < text.length && /\s/.test(text[j])) j++;
+            if (text[j] === '}' || text[j] === ']') continue;
+        }
+        out += c;
+    }
+    return out;
+}
+
+type TsConfig = {
+    extends?: string | string[];
+    compilerOptions?: { baseUrl?: string; paths?: Record<string, string[]> };
+};
+
+function parseTsConfig(text: string): TsConfig {
+    return JSON.parse(stripTrailingCommas(stripJsonComments(text))) as TsConfig;
+}
+
+/** Options after `extends`, with every directory already absolute. */
+type Effective = {
+    baseUrl?: string;
+    paths?: Record<string, string[]>;
+    /** Directory of the config that declared `paths` (their base when there is no `baseUrl`). */
+    pathsDir?: string;
+};
+
+function ownOptions(config: TsConfig, configDir: string): Effective {
+    const co = config.compilerOptions ?? {};
+    const out: Effective = {};
+    if (typeof co.baseUrl === 'string') out.baseUrl = path.resolve(configDir, co.baseUrl);
+    if (co.paths && typeof co.paths === 'object') { out.paths = co.paths; out.pathsDir = configDir; }
+    return out;
+}
+
+function toAliasMap(eff: Effective): AliasMap | undefined {
+    const paths = eff.paths ?? {};
+    if (!eff.baseUrl && !Object.keys(paths).length) return undefined;
+    return { baseUrl: eff.baseUrl ?? eff.pathsDir, paths };
+}
+
+/**
  * Parse tsconfig/jsconfig text. `configDir` is the directory the file lives in,
  * which `baseUrl` is relative to. Returns undefined when there is nothing to
- * resolve with (no baseUrl and no paths).
+ * resolve with (no baseUrl and no paths). `extends` is not followed; see
+ * `loadAliasConfig`.
  */
 export function parseAliasConfig(text: string, configDir: string): AliasMap | undefined {
     try {
-        const parsed = JSON.parse(stripJsonComments(text)) as {
-            compilerOptions?: { baseUrl?: string; paths?: Record<string, string[]> };
-        };
-        const co = parsed.compilerOptions;
-        if (!co) return undefined;
-        const paths = co.paths && typeof co.paths === 'object' ? co.paths : {};
-        if (!co.baseUrl && !Object.keys(paths).length) return undefined;
-        return {
-            baseUrl: path.resolve(configDir, co.baseUrl ?? '.'),
-            paths,
-        };
+        return toAliasMap(ownOptions(parseTsConfig(text), configDir));
     } catch {
         return undefined;
     }
+}
+
+const isFile = (p: string) => fs.statSync(p, { throwIfNoEntry: false })?.isFile() ?? false;
+
+/** Locate an `extends` target: a relative/absolute path, or a package under node_modules. */
+function resolveExtends(spec: string, fromDir: string): string | undefined {
+    if (spec.startsWith('.') || path.isAbsolute(spec)) {
+        const p = path.resolve(fromDir, spec);
+        return [p, p + '.json'].find(isFile);
+    }
+    for (let dir = fromDir; ; dir = path.dirname(dir)) {
+        const p = path.join(dir, 'node_modules', spec);
+        const hit = [p, p + '.json', path.join(p, 'tsconfig.json')].find(isFile);
+        if (hit) return hit;
+        if (path.dirname(dir) === dir) return undefined;
+    }
+}
+
+function readEffective(file: string, depth: number): Effective {
+    // A cycle or a runaway chain degrades to what was gathered so far.
+    if (depth > 10) return {};
+    let config: TsConfig;
+    try {
+        config = parseTsConfig(fs.readFileSync(file, 'utf8'));
+    } catch {
+        return {};
+    }
+    const dir = path.dirname(file);
+    let out: Effective = {};
+    // Later `extends` entries override earlier ones; the file itself overrides them all.
+    const bases = Array.isArray(config.extends) ? config.extends : config.extends ? [config.extends] : [];
+    for (const spec of bases) {
+        const base = typeof spec === 'string' ? resolveExtends(spec, dir) : undefined;
+        if (base) out = { ...out, ...readEffective(base, depth + 1) };
+    }
+    return { ...out, ...ownOptions(config, dir) };
+}
+
+/** Read a tsconfig/jsconfig file, following its `extends` chain the way TypeScript does. */
+export function loadAliasConfig(file: string): AliasMap | undefined {
+    return toAliasMap(readEffective(file, 0));
 }
 
 /**
@@ -110,13 +200,9 @@ export function aliasCandidates(spec: string, aliases: AliasMap): string[] {
 export function loadAliases(root: string): AliasMap | undefined {
     for (const name of ['tsconfig.json', 'jsconfig.json']) {
         const p = path.join(root, name);
-        try {
-            if (!fs.existsSync(p)) continue;
-            const map = parseAliasConfig(fs.readFileSync(p, 'utf8'), root);
-            if (map) return map;
-        } catch {
-            // fall through to the next candidate
-        }
+        if (!isFile(p)) continue;
+        const map = loadAliasConfig(p);
+        if (map) return map;
     }
     return undefined;
 }

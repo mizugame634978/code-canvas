@@ -143,14 +143,51 @@ function parseRequireTarget(target: string): ImportBinding[] {
 }
 
 /**
+ * Replace `//` and block comments with spaces, keeping every newline, so a
+ * commented-out `import` draws no edge while offsets and line numbers stay
+ * valid for the regexes run over the result. Quotes and template literals are
+ * tracked so `'http://x'` survives; regex literals are not, which at worst
+ * blanks the rest of an odd line.
+ */
+export function blankJsComments(code: string): string {
+    let out = '';
+    let quote = '';
+    for (let i = 0; i < code.length; i++) {
+        const c = code[i];
+        if (quote) {
+            out += c;
+            if (c === '\\' && i + 1 < code.length) { out += code[++i]; continue; }
+            if (c === quote || (c === '\n' && quote !== '`')) quote = '';
+            continue;
+        }
+        if (c === '"' || c === "'" || c === '`') { quote = c; out += c; continue; }
+        if (c === '/' && code[i + 1] === '/') {
+            while (i < code.length && code[i] !== '\n') { out += ' '; i++; }
+            if (i < code.length) out += '\n';
+            continue;
+        }
+        if (c === '/' && code[i + 1] === '*') {
+            const end = code.indexOf('*/', i + 2);
+            const stop = end < 0 ? code.length : end + 2;
+            for (; i < stop; i++) out += code[i] === '\n' ? '\n' : ' ';
+            i--;
+            continue;
+        }
+        out += c;
+    }
+    return out;
+}
+
+/**
  * Scan JS/TS source for module specifiers together with the bindings they carry.
  * Covers: `import d, { a, b as c } from`, `import * as ns from`, `import 'x'`,
  * `export { a } from`, `export * [as ns] from`, `import('x')` and `require('x')`.
  */
-export function parseJsTsImports(code: string): ImportSpec[] {
+export function parseJsTsImports(source: string): ImportSpec[] {
     const acc = collect();
-    if (!code) return acc.done();
+    if (!source) return acc.done();
     try {
+        const code = blankJsComments(source);
         const starts = buildLineStarts(code);
         let m: RegExpExecArray | null;
 

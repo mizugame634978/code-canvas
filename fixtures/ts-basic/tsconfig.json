@@ -1,0 +1,8 @@
+{
+  // paths は extends 先に書いてある（よくある構成）
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "strict": true,
+    "jsx": "react-jsx"
+  }
+}

@@ -564,11 +564,17 @@ export async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (i
     return results;
 }
 
+/**
+ * Whether `p` is a regular file. Every caller probes for a source file, and a
+ * bare existence check let `./components` resolve to the directory itself
+ * before `./components/index.ts` was ever tried.
+ */
 function existsCached(p: string, cache?: Map<string, boolean>): boolean {
-    if (!cache) return fs.existsSync(p);
+    const isFile = () => fs.statSync(p, { throwIfNoEntry: false })?.isFile() ?? false;
+    if (!cache) return isFile();
     const hit = cache.get(p);
     if (hit !== undefined) return hit;
-    const v = fs.existsSync(p);
+    const v = isFile();
     cache.set(p, v);
     return v;
 }
@@ -617,13 +623,19 @@ function resolveJsTs(fromFile: string, spec: string, exists?: Map<string, boolea
         bases.push(...aliasCandidates(spec, aliases));
     }
     for (const base of bases) {
-        for (const t of tries) {
-            const p = base + t;
+        // ESM TypeScript names the emitted file (`./date.js`) while the source
+        // on disk is `./date.ts`; TypeScript checks the source first, so do we.
+        const ext = path.extname(base);
+        const fromTs = (JS_TO_TS[ext] ?? []).map(t => base.slice(0, -ext.length) + t);
+        for (const p of [...fromTs, ...tries.map(t => base + t)]) {
             if (existsCached(p, exists)) return normalizePath(p);
         }
     }
     return undefined;
 }
+
+/** Source extensions a `.js`/`.jsx` specifier may stand for. */
+const JS_TO_TS: Record<string, string[]> = { '.js': ['.ts', '.tsx'], '.jsx': ['.tsx'] };
 
 type GoModule = { module: string; dir: string };
 
