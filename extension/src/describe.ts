@@ -10,7 +10,7 @@
  * summary, never an exception.
  */
 
-export type SourceLang = 'js' | 'ts' | 'py' | 'go' | 'rs' | 'java' | 'cs' | 'other';
+export type SourceLang = 'js' | 'ts' | 'py' | 'go' | 'rs' | 'java' | 'cs' | 'xaml' | 'other';
 
 const MAX_SUMMARY_CHARS = 240;
 const MAX_LISTED_SYMBOLS = 4;
@@ -182,6 +182,15 @@ function extractCsDoc(source: string): string | undefined {
     return body && !BOILERPLATE.test(body) ? body : undefined;
 }
 
+/** The first `<!-- ... -->` comment of a XAML file, before the root element closes. */
+function extractXamlDoc(source: string): string | undefined {
+    const head = source.slice(0, 12000);
+    const m = /<!--([\s\S]*?)-->/.exec(head);
+    if (!m) return undefined;
+    const body = m[1].replace(/\s+/g, ' ').trim();
+    return body && !BOILERPLATE.test(body) ? body : undefined;
+}
+
 /** Leading JSDoc / block comment / module docstring, first sentence only. */
 export function extractDocSummary(source: string, lang: SourceLang): string | undefined {
     try {
@@ -191,6 +200,7 @@ export function extractDocSummary(source: string, lang: SourceLang): string | un
                 : lang === 'rs' ? extractRustDoc(source)
                     : lang === 'java' ? extractJavaDoc(source)
                         : lang === 'cs' ? extractCsDoc(source)
+                            : lang === 'xaml' ? extractXamlDoc(source)
                             : extractJsDoc(source);
         if (!body) return undefined;
         const sentence = firstSentence(body);
@@ -279,6 +289,12 @@ export function extractExportedSymbols(source: string, lang: SourceLang): string
             while ((m = RE_CS_PUBLIC_TYPE.exec(source))) push(m[1]);
             return out;
         }
+        if (lang === 'xaml') {
+            // The class this markup is half of, so searching `MainWindow` finds the .xaml too.
+            const cls = /x:Class\s*=\s*"([\w.]+)"/.exec(source);
+            if (cls) push(cls[1].slice(cls[1].lastIndexOf('.') + 1));
+            return out;
+        }
         let m: RegExpExecArray | null;
         RE_JS_EXPORT_DECL.lastIndex = 0;
         while ((m = RE_JS_EXPORT_DECL.exec(source))) push(m[1]);
@@ -320,6 +336,7 @@ const LANG_NAME: Record<SourceLang, string> = {
     rs: 'Rust',
     java: 'Java',
     cs: 'C#',
+    xaml: 'XAML',
     other: 'Source',
 };
 

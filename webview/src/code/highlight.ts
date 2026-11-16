@@ -6,6 +6,7 @@ import go from 'highlight.js/lib/languages/go';
 import rust from 'highlight.js/lib/languages/rust';
 import java from 'highlight.js/lib/languages/java';
 import csharp from 'highlight.js/lib/languages/csharp';
+import xml from 'highlight.js/lib/languages/xml';
 import plaintext from 'highlight.js/lib/languages/plaintext';
 import * as log from '../log';
 
@@ -18,10 +19,11 @@ hljs.registerLanguage('go', go);
 hljs.registerLanguage('rust', rust);
 hljs.registerLanguage('java', java);
 hljs.registerLanguage('csharp', csharp);
+hljs.registerLanguage('xml', xml);
 hljs.registerLanguage('plaintext', plaintext);
 
 /** Languages the indexer knows about; `other` falls back to plaintext. */
-export type Lang = 'ts' | 'js' | 'py' | 'go' | 'rs' | 'java' | 'cs' | 'other';
+export type Lang = 'ts' | 'js' | 'py' | 'go' | 'rs' | 'java' | 'cs' | 'xaml' | 'other';
 
 // A mapping object is slightly cleaner than a long ternary chain.
 const languageMap: Record<Lang, string> = {
@@ -32,6 +34,7 @@ const languageMap: Record<Lang, string> = {
     rs: 'rust',
     java: 'java',
     cs: 'csharp',
+    xaml: 'xml',
     other: 'plaintext'
 };
 

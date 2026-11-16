@@ -11,6 +11,7 @@ import {
 import { aliasCandidates, loadAliases, type AliasMap } from './aliases';
 import { makeExactCaseExists, resolvePyImport } from './pyResolve';
 import { buildCsTypeIndex, resolveCsReferences } from './csResolve';
+import { resolveXamlReferences } from './xamlResolve';
 import { describeFile, describeFolder, extractDocSummary, extractExportedSymbols, type FileImportDetail, type SourceLang } from './describe';
 
 const JS_GLOB = ['**/*.{js,jsx,ts,tsx}'];
@@ -19,6 +20,7 @@ const GO_GLOB = ['**/*.go'];
 const RS_GLOB = ['**/*.rs'];
 const JAVA_GLOB = ['**/*.java'];
 const CS_GLOB = ['**/*.cs'];
+const XAML_GLOB = ['**/*.xaml'];
 
 const EXT_LANG: Record<string, SourceLang> = {
     '.py': 'py',
@@ -28,6 +30,7 @@ const EXT_LANG: Record<string, SourceLang> = {
     '.rs': 'rs',
     '.java': 'java',
     '.cs': 'cs',
+    '.xaml': 'xaml',
 };
 
 /** Cap on how many files a package/namespace import may point at. */
@@ -70,7 +73,7 @@ export type Index = {
 export async function buildIndex(root: string): Promise<Index> {
     const excludes: string[] = vscode.workspace.getConfiguration('codeCanvas').get('excludeGlobs') || [];
     const rawFiles = new Set<string>();
-    for (const glob of [JS_GLOB, PY_GLOB, GO_GLOB, RS_GLOB, JAVA_GLOB, CS_GLOB]) {
+    for (const glob of [JS_GLOB, PY_GLOB, GO_GLOB, RS_GLOB, JAVA_GLOB, CS_GLOB, XAML_GLOB]) {
         for (const f of await fg(glob, { cwd: root, absolute: true, ignore: excludes })) rawFiles.add(f);
     }
     const files = Array.from(rawFiles).map(f => normalizePath(f));
@@ -114,6 +117,7 @@ export async function buildIndex(root: string): Promise<Index> {
         if (pkg) pushTo(javaPackageFiles, pkg, f);
     }
     const csTypes = buildCsTypeIndex([...sources].filter(([f]) => lang.get(f) === 'cs'));
+    const xamlProjectDirs = new Map<string, string | undefined>();
 
     for (const [f, src] of sources) {
         const fileLang = lang.get(f) ?? 'other';
@@ -125,10 +129,11 @@ export async function buildIndex(root: string): Promise<Index> {
             root, fromFile: f, aliases, existsCache,
             goModules, goByDir, javaTypeByFqn, javaPackageFiles,
         };
-        // C# links by the types a file uses, each at its own line; every other
-        // language resolves one import statement at a time.
+        // C# and XAML link by the types (and XAML files) a file names, each at
+        // its own line; every other language resolves one import at a time.
         const hits: { file: string; bindings: ImportBinding[]; line: number }[] = [];
         if (fileLang === 'cs') hits.push(...resolveCsReferences(src, csTypes));
+        if (fileLang === 'xaml') hits.push(...resolveXamlReferences(f, src, csTypes, p => existsCached(p, existsCache), xamlProjectDirs));
         for (const { spec, line, bindings } of specs) {
             // Python splits one statement across files (`from pkg import submodule, func`),
             // so it hands back the bindings per target; every other language shares them.
@@ -583,6 +588,8 @@ function parseForLang(lang: SourceLang, src: string): ImportSpec[] {
         case 'go': return parseGoImports(src);
         case 'rs': return parseRustImports(src);
         case 'java': return parseJavaImports(src);
+        case 'cs':
+        case 'xaml': return []; // resolved by type name, not by import statement
         default: return parseJsTsImports(src);
     }
 }
