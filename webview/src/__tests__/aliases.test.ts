@@ -25,7 +25,7 @@ describe('parseAliasConfig', () => {
             }
         }`;
         const map = parseAliasConfig(cfg, '/proj')!;
-        expect(map.baseUrl).toBe('/proj');
+        expect(map.baseUrl).toBe(path.resolve('/proj'));
         expect(map.paths['@/*']).toEqual(['src/*']);
     });
 
