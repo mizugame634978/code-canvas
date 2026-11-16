@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-    parseCsImports,
     parseGoImports,
     parseJavaImports,
     parseRustImports,
@@ -50,22 +49,6 @@ import a.b.*;
         const specs = parseJavaImports(src);
         expect(specs.map(s => s.spec)).toEqual(['java.util.List', 'a.b.C.method', 'a.b.*']);
         expect(specs[2].bindings[0].name).toBe('*');
-    });
-});
-
-describe('parseCsImports', () => {
-    it('parses using directives and skips aliases and statements', () => {
-        const src = `global using System;
-using System.Collections.Generic;
-using Foo = Bar.Baz;
-using (var x = Open()) { }
-using static System.Math;
-`;
-        expect(parseCsImports(src).map(s => s.spec)).toEqual([
-            'System',
-            'System.Collections.Generic',
-            'System.Math',
-        ]);
     });
 });
 

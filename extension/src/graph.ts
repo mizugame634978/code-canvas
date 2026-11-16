@@ -5,11 +5,12 @@ import * as vscode from 'vscode';
 import type { AutoDescriptions, EdgeLink, Graph, GraphNode } from './util';
 import { getDocumentSymbols } from './lsp';
 import {
-    parseJsTsImports, parsePyImports, parseGoImports, parseRustImports, parseJavaImports, parseCsImports,
+    parseJsTsImports, parsePyImports, parseGoImports, parseRustImports, parseJavaImports,
     type ImportBinding, type ImportSpec,
 } from './imports';
 import { aliasCandidates, loadAliases, type AliasMap } from './aliases';
 import { makeExactCaseExists, resolvePyImport } from './pyResolve';
+import { buildCsTypeIndex, resolveCsReferences } from './csResolve';
 import { describeFile, describeFolder, extractDocSummary, extractExportedSymbols, type FileImportDetail, type SourceLang } from './describe';
 
 const JS_GLOB = ['**/*.{js,jsx,ts,tsx}'];
@@ -102,23 +103,17 @@ export async function buildIndex(root: string): Promise<Index> {
         if (lang.get(f) === 'go') pushTo(goByDir, normalizePath(path.dirname(f)), f);
     }
     // Java and C# imports name types/packages, not paths, so the first pass
-    // maps fully-qualified names and namespaces back to the files declaring them.
+    // maps fully-qualified names back to the files declaring them.
     const javaTypeByFqn = new Map<string, string>();
     const javaPackageFiles = new Map<string, string[]>();
-    const csNamespaceFiles = new Map<string, string[]>();
     for (const [f, src] of sources) {
-        const fileLang = lang.get(f);
-        if (fileLang === 'java') {
-            const pkg = RE_JAVA_PACKAGE.exec(src)?.[1] ?? '';
-            const name = path.basename(f, '.java');
-            javaTypeByFqn.set(pkg ? `${pkg}.${name}` : name, f);
-            if (pkg) pushTo(javaPackageFiles, pkg, f);
-        } else if (fileLang === 'cs') {
-            RE_CS_NAMESPACE.lastIndex = 0;
-            let m: RegExpExecArray | null;
-            while ((m = RE_CS_NAMESPACE.exec(src))) pushTo(csNamespaceFiles, m[1], f);
-        }
+        if (lang.get(f) !== 'java') continue;
+        const pkg = RE_JAVA_PACKAGE.exec(src)?.[1] ?? '';
+        const name = path.basename(f, '.java');
+        javaTypeByFqn.set(pkg ? `${pkg}.${name}` : name, f);
+        if (pkg) pushTo(javaPackageFiles, pkg, f);
     }
+    const csTypes = buildCsTypeIndex([...sources].filter(([f]) => lang.get(f) === 'cs'));
 
     for (const [f, src] of sources) {
         const fileLang = lang.get(f) ?? 'other';
@@ -128,30 +123,33 @@ export async function buildIndex(root: string): Promise<Index> {
         const bindingMap = new Map<string, PlacedBinding[]>();
         const ctx: Omit<ResolveContext, 'spec'> = {
             root, fromFile: f, aliases, existsCache,
-            goModules, goByDir, javaTypeByFqn, javaPackageFiles, csNamespaceFiles,
+            goModules, goByDir, javaTypeByFqn, javaPackageFiles,
         };
+        // C# links by the types a file uses, each at its own line; every other
+        // language resolves one import statement at a time.
+        const hits: { file: string; bindings: ImportBinding[]; line: number }[] = [];
+        if (fileLang === 'cs') hits.push(...resolveCsReferences(src, csTypes));
         for (const { spec, line, bindings } of specs) {
             // Python splits one statement across files (`from pkg import submodule, func`),
             // so it hands back the bindings per target; every other language shares them.
-            let list: { file: string; bindings: ImportBinding[] }[];
             if (fileLang === 'py') {
-                list = resolvePyImport(root, f, spec, bindings, pyExists);
-            } else {
-                const resolved = resolveSpec(fileLang, { ...ctx, spec });
-                if (!resolved) continue;
-                list = (Array.isArray(resolved) ? resolved : [resolved]).map(file => ({ file, bindings }));
+                for (const r of resolvePyImport(root, f, spec, bindings, pyExists)) hits.push({ ...r, line });
+                continue;
             }
-            for (const r of list) {
-                const rNorm = normalizePath(r.file);
-                if (rNorm === f) continue;
-                targets.add(rNorm);
-                const arr = lineMap.get(rNorm) || [];
-                arr.push(line);
-                lineMap.set(rNorm, arr);
-                const acc = bindingMap.get(rNorm) || [];
-                for (const b of r.bindings) acc.push({ ...b, line });
-                bindingMap.set(rNorm, acc);
-            }
+            const resolved = resolveSpec(fileLang, { ...ctx, spec });
+            if (!resolved) continue;
+            for (const file of Array.isArray(resolved) ? resolved : [resolved]) hits.push({ file, bindings, line });
+        }
+        for (const r of hits) {
+            const rNorm = normalizePath(r.file);
+            if (rNorm === f) continue;
+            targets.add(rNorm);
+            const arr = lineMap.get(rNorm) || [];
+            arr.push(r.line);
+            lineMap.set(rNorm, arr);
+            const acc = bindingMap.get(rNorm) || [];
+            for (const b of r.bindings) acc.push({ ...b, line: r.line });
+            bindingMap.set(rNorm, acc);
         }
         imports.set(f, targets);
         importLines.set(f, lineMap);
@@ -585,7 +583,6 @@ function parseForLang(lang: SourceLang, src: string): ImportSpec[] {
         case 'go': return parseGoImports(src);
         case 'rs': return parseRustImports(src);
         case 'java': return parseJavaImports(src);
-        case 'cs': return parseCsImports(src);
         default: return parseJsTsImports(src);
     }
 }
@@ -600,7 +597,6 @@ type ResolveContext = {
     goByDir: Map<string, string[]>;
     javaTypeByFqn: Map<string, string>;
     javaPackageFiles: Map<string, string[]>;
-    csNamespaceFiles: Map<string, string[]>;
 };
 
 function resolveSpec(lang: SourceLang, ctx: ResolveContext): string | string[] | undefined {
@@ -608,7 +604,6 @@ function resolveSpec(lang: SourceLang, ctx: ResolveContext): string | string[] |
         case 'go': return resolveGo(ctx);
         case 'rs': return resolveRust(ctx);
         case 'java': return resolveJava(ctx);
-        case 'cs': return resolveCs(ctx);
         default: return resolveJsTs(ctx.fromFile, ctx.spec, ctx.existsCache, ctx.aliases);
     }
 }
@@ -765,20 +760,7 @@ function resolveJava(ctx: ResolveContext): string | string[] | undefined {
 }
 
 /** `using A.B;` → the files declaring namespace `A.B` (or its nearest parent). */
-function resolveCs(ctx: ResolveContext): string[] | undefined {
-    let ns: string | undefined = ctx.spec;
-    while (ns) {
-        const files = ctx.csNamespaceFiles.get(ns);
-        if (files && files.length) return files.slice(0, MAX_PACKAGE_TARGETS);
-        const idx = ns.lastIndexOf('.');
-        if (idx < 0) break;
-        ns = ns.slice(0, idx);
-    }
-    return undefined;
-}
-
 const RE_JAVA_PACKAGE = /^[ \t]*package[ \t]+([\w.]+)[ \t]*;/m;
-const RE_CS_NAMESPACE = /^[ \t]*namespace[ \t]+([A-Za-z_][\w.]*)/gm;
 
 function pushTo(map: Map<string, string[]>, key: string, value: string): void {
     const arr = map.get(key);

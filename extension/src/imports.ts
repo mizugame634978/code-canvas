@@ -331,30 +331,6 @@ export function parseJavaImports(code: string): ImportSpec[] {
     return acc.done();
 }
 
-// ---------------------------------------------------------------------------
-// C#
-// ---------------------------------------------------------------------------
-
-const RE_CS_USING = /^[ \t]*(?:global[ \t]+)?using[ \t]+(?:static[ \t]+)?([A-Za-z_][\w.]*)[ \t]*;/gm;
-
-/** `using X.Y;` / `global using X.Y;` / `using static X.Y;` (aliases are skipped). */
-export function parseCsImports(code: string): ImportSpec[] {
-    const acc = collect();
-    if (!code) return acc.done();
-    try {
-        const starts = buildLineStarts(code);
-        let m: RegExpExecArray | null;
-        RE_CS_USING.lastIndex = 0;
-        while ((m = RE_CS_USING.exec(code))) {
-            const spec = m[1];
-            acc.add(spec, lineAt(starts, m.index), [{ name: spec.split('.').pop() || spec, kind: 'namespace' }]);
-        }
-    } catch {
-        // See parseJsTsImports.
-    }
-    return acc.done();
-}
-
 /**
  * Scan Python source. Covers `import x`, `import x as y`, `import a, b`,
  * `from x import a, b as c` and the parenthesised multi-line form.

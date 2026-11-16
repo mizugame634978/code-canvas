@@ -121,6 +121,9 @@
                         "**/vendor/**",
                         "**/Pods/**",
                         "**/.gradle/**",
+                        "**/obj/**",
+                        "**/bin/Debug/**",
+                        "**/bin/Release/**",
                         "**/logs/**",
                         "**/.git/**"
                     ],
