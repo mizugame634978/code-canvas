@@ -7,7 +7,10 @@
     "build": "npm -w webview run build && npm -w extension run build",
     "watch": "npm -w webview run dev & npm -w extension run watch",
     "package": "npm -w extension run package",
-    "test": "npm -w webview run test"
+    "test": "npm -w webview run test",
+    "typecheck": "tsc --noEmit -p extension/tsconfig.json && tsc --noEmit -p webview/tsconfig.json",
+    "verify": "npm run typecheck && npm test && npm run build",
+    "snapshot": "node tools/snapshot.mjs"
   },
   "keywords": [],
   "author": "",
@@ -20,5 +23,8 @@
     "webview",
     "extension"
   ],
-  "overrides": {}
+  "overrides": {},
+  "devDependencies": {
+    "playwright": "1.65.1"
+  }
 }

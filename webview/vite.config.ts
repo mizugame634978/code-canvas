@@ -1,4 +1,5 @@
-﻿import { defineConfig } from 'vite';
+﻿/// <reference types="vitest/config" />
+import { defineConfig } from 'vite';
 import path from 'path';
 
 export default defineConfig({
@@ -14,5 +15,10 @@ export default defineConfig({
             input: path.resolve(__dirname, 'index.html'),
         },
         target: 'chrome120'
-    }
+    },
+    test: {
+        // The indexer (extension/src/graph.ts) imports `vscode`; the stub lets
+        // tests run the whole pipeline in plain Node against fixtures/.
+        alias: { vscode: path.resolve(__dirname, '../tools/vscode-stub.cjs') },
+    },
 });
