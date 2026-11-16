@@ -39,3 +39,6 @@ Thumbs.db
 
 # Worktrees
 .worktrees/
+
+# AI ハーネスの作業領域（バンドル結果・スクリーンショット）
+tools/.cache/

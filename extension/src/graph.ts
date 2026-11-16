@@ -9,6 +9,7 @@ import {
     type ImportBinding, type ImportSpec,
 } from './imports';
 import { aliasCandidates, loadAliases, type AliasMap } from './aliases';
+import { makeExactCaseExists, resolvePyImport } from './pyResolve';
 import { describeFile, describeFolder, extractDocSummary, extractExportedSymbols, type FileImportDetail, type SourceLang } from './describe';
 
 const JS_GLOB = ['**/*.{js,jsx,ts,tsx}'];
@@ -87,6 +88,7 @@ export async function buildIndex(root: string): Promise<Index> {
     // candidate paths per import) so we never stat the same path twice. Scoped to
     // this build so a later reload re-probes fresh (P2-5).
     const existsCache = new Map<string, boolean>();
+    const pyExists = makeExactCaseExists(root, p => existsCached(p, existsCache));
 
     // P2-5: read files asynchronously with bounded concurrency instead of a
     // sequential wall of blocking readFileSync calls.
@@ -129,18 +131,25 @@ export async function buildIndex(root: string): Promise<Index> {
             goModules, goByDir, javaTypeByFqn, javaPackageFiles, csNamespaceFiles,
         };
         for (const { spec, line, bindings } of specs) {
-            const resolved = resolveSpec(fileLang, { ...ctx, spec });
-            if (!resolved) continue;
-            const list = Array.isArray(resolved) ? resolved : [resolved];
+            // Python splits one statement across files (`from pkg import submodule, func`),
+            // so it hands back the bindings per target; every other language shares them.
+            let list: { file: string; bindings: ImportBinding[] }[];
+            if (fileLang === 'py') {
+                list = resolvePyImport(root, f, spec, bindings, pyExists);
+            } else {
+                const resolved = resolveSpec(fileLang, { ...ctx, spec });
+                if (!resolved) continue;
+                list = (Array.isArray(resolved) ? resolved : [resolved]).map(file => ({ file, bindings }));
+            }
             for (const r of list) {
-                const rNorm = normalizePath(r);
+                const rNorm = normalizePath(r.file);
                 if (rNorm === f) continue;
                 targets.add(rNorm);
                 const arr = lineMap.get(rNorm) || [];
                 arr.push(line);
                 lineMap.set(rNorm, arr);
                 const acc = bindingMap.get(rNorm) || [];
-                for (const b of bindings) acc.push({ ...b, line });
+                for (const b of r.bindings) acc.push({ ...b, line });
                 bindingMap.set(rNorm, acc);
             }
         }
@@ -306,14 +315,18 @@ export async function subgraph(index: Index, seeds: string[], maxNodes: number):
             const sid = nodeIdByPath.get(s)!;
             const tid = nodeIdByPath.get(t)!;
             const lines = lineMap.get(t) || [];
-            const sourceLine = lines.length ? lines[0] : undefined;
+            const importLine = lines.length ? lines[0] : undefined;
             const links = await buildEdgeLinks(bindingMap.get(t) || [], () => getSymbols(t));
+            // Direction: PROVIDER -> CONSUMER. `s` imports from `t`, so `t`
+            // provides the symbols and `s` consumes them. The arrow tip lands
+            // on the consumer, and the hover list ("symbols crossing this
+            // boundary") reads as the flow from the file that defines them.
             edges.push({
-                id: `e_${hashString(s + '->' + t + '#' + (sourceLine ?? -1))}`,
-                source: sid,
-                target: tid,
-                sourceLine,
-                targetLine: links[0]?.targetLine ?? 0,
+                id: `e_${hashString(t + '->' + s + '#' + (importLine ?? -1))}`,
+                source: tid,
+                target: sid,
+                sourceLine: links[0]?.sourceLine ?? 0,
+                targetLine: importLine,
                 links,
             });
         }
@@ -358,11 +371,13 @@ async function buildEdgeLinks(
             symbolName: named ? b.name : undefined,
             alias: b.alias,
             kind: b.kind,
-            sourceLine: b.line,
-            targetLine: (named ? byName.get(b.name) : undefined) ?? fallbackLine,
+            // Endpoint-relative: the definition lives in the SOURCE (the file
+            // that provides the symbol), the import statement in the TARGET.
+            sourceLine: (named ? byName.get(b.name) : undefined) ?? fallbackLine,
+            targetLine: b.line,
         });
     }
-    if (!out.length) out.push({ targetLine: fallbackLine, kind: 'module' });
+    if (!out.length) out.push({ sourceLine: fallbackLine, targetLine: 0, kind: 'module' });
     return out;
 }
 
@@ -584,7 +599,6 @@ type ResolveContext = {
 
 function resolveSpec(lang: SourceLang, ctx: ResolveContext): string | string[] | undefined {
     switch (lang) {
-        case 'py': return resolvePy(ctx.root, ctx.spec, ctx.existsCache);
         case 'go': return resolveGo(ctx);
         case 'rs': return resolveRust(ctx);
         case 'java': return resolveJava(ctx);
@@ -609,15 +623,6 @@ function resolveJsTs(fromFile: string, spec: string, exists?: Map<string, boolea
         }
     }
     return undefined;
-}
-
-function resolvePy(root: string, mod: string, exists?: Map<string, boolean>): string | undefined {
-    const parts = mod.split('.');
-    const candidates = [
-        path.resolve(root, ...parts) + '.py',
-        path.resolve(root, ...parts, '__init__.py')
-    ];
-    for (const p of candidates) if (existsCached(p, exists)) return normalizePath(p);
 }
 
 type GoModule = { module: string; dir: string };
