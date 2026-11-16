@@ -13,6 +13,7 @@ VS Code 拡張「Code Canvas」の fork。ワークスペースの import 関係
 |---|---|
 | `npm run verify` | 型チェック（extension / webview）→ テスト → ビルド。**作業の区切りごとに必ず通す** |
 | `npm test` | vitest。`webview/src/__tests__/` に extension 側のテストも置いている |
+| `node tools/edges.mjs <フォルダ> [--isolated]` | 解析結果の線を1行1本で一覧表示する。画面を撮るより速く確実。fixture のテストと同じ形式 |
 | `npm run snapshot -- <フォルダ> [--reveal all\|<相対パス,...>] [--out <png>]` | キャンバスのスクリーンショットを撮る。結果の PNG は Read ツールで見る |
 
 - スナップショットは**ビルド済みの** webview（`extension/media`）を使う。webview を直したら先に `npm run build`
@@ -30,11 +31,12 @@ VS Code 拡張「Code Canvas」の fork。ワークスペースの import 関係
 | `tools/lib/indexer.mjs` | `extension/src/graph.ts` を esbuild でバンドルし、スタブで動かす（`buildGraph(root)`） |
 | `tools/snapshot.mjs` | 上のグラフをヘッドレス Chromium の webview に流し込み、撮影する |
 | `webview/vite.config.ts` の `test.alias` | テストでも `vscode` をスタブに差し替える。これで `graph.ts` を丸ごとテストできる |
-| `fixtures/<名前>/` | 解析対象のサンプルプロジェクト。期待する線をテスト（例: `fixtures-python.test.ts`）で固定する |
+| `fixtures/<名前>/` | 解析対象のサンプルプロジェクト（`python-basic`、`ts-basic`）。期待する線を `fixtures-<言語>.test.ts` で固定する。各 README に含めた書き方の一覧がある |
+| `webview/src/__tests__/fixtureGraph.ts` | fixture を解析して線の一覧を返すテスト用の補助関数 |
 
 ## バグを直す手順
 
-1. `fixtures/` に再現用のファイルを足す（既存の fixture に足すか、新しく作る）
+1. `fixtures/` に再現用のファイルを足す（既存の fixture に足すか、新しく作る）。`node tools/edges.mjs` で今の結果を見る
 2. テストに期待値を書き、**修正前に失敗することを確認する**
 3. 修正して `npm run verify`
 4. 画面に関わる修正なら `npm run snapshot` で撮って、画像を見て確かめる
@@ -51,6 +53,9 @@ VS Code 拡張「Code Canvas」の fork。ワークスペースの import 関係
 - **esbuild でバンドルしたファイル内の `__dirname` はバンドル先**（`tools/.cache`）になる。スタブは `CC_REPO_ROOT` 環境変数でリポジトリの場所を受け取る
 - **拡張機能内でファイルパスを受け渡すときは `normalizePath`（`graph.ts`）の形にそろえる**。webview はパスの文字列が完全一致しないとノードを見つけられない
 - **`git status --porcelain` は `-z` なしだと日本語などのパスを `"\346\227..."` とエスケープする**。パスはリポジトリのルート基準で、未追跡のフォルダはフォルダ名だけになる（`--untracked-files=all` で中身が出る）
+- **`fs.existsSync` はフォルダでも true**。import 先の候補を調べるときはファイルかどうか（`isFile`）で判定する（`./components` がフォルダそのものに解決されていた）
+- **tsconfig は JSON ではない**。コメント・末尾カンマ・`extends` がある。読み込みは `aliases.ts` の `loadAliasConfig` を使う
+- **import を正規表現で探すときはコメントを先に消す**（`blankJsComments`）。行番号を保つため、削除ではなく空白に置き換える
 - import 文の行番号（`ImportSpec.line`）は **0 始まり**（VS Code の Position と同じ）
 - `webview` をビルドすると `extension/media/` は丸ごと消えて作り直される。手で編集しない
 - vitest の中の `console.log` は出力が拾いにくい。調査用の出力はファイルに書き出す
