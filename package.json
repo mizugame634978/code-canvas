@@ -10,7 +10,9 @@
     "test": "npm -w webview run test",
     "typecheck": "tsc --noEmit -p extension/tsconfig.json && tsc --noEmit -p webview/tsconfig.json",
     "verify": "npm run typecheck && npm test && npm run build",
-    "snapshot": "node tools/snapshot.mjs"
+    "snapshot": "node tools/snapshot.mjs",
+    "package:local": "node tools/package-local.mjs",
+    "install:local": "node tools/package-local.mjs --install"
   },
   "keywords": [],
   "author": "",
