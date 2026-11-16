@@ -27,6 +27,9 @@ module.exports = {
     Uri: { file: (p) => ({ fsPath: p, toString: () => p }) },
     SymbolKind: { Class: 4, Method: 5, Function: 11, Variable: 12, Constant: 13, Interface: 10 },
     commands: { executeCommand: async () => [] },
+    // 組み込みの Git 拡張は無い扱い。git.ts は `git status` を直接呼ぶ予備の経路を通る
+    extensions: { getExtension: () => undefined },
+    Disposable: class { constructor(fn) { this.dispose = fn; } },
     Position,
     Range,
 };

@@ -1,6 +1,7 @@
 ﻿import * as vscode from 'vscode';
 import { execFile } from 'child_process';
-import { parsePorcelain } from './porcelain';
+import { normalizePath } from './graph';
+import { parsePorcelain, toWorkspacePaths } from './porcelain';
 
 export async function getChangedFiles(): Promise<string[]> {
     // Prefer the Git extension API: it knows every open repository.
@@ -31,15 +32,25 @@ export async function getChangedFiles(): Promise<string[]> {
  *
  * This used to be a blocking spawnSync in the extension host. The porcelain
  * parsing lives in `porcelain.ts` so it can be tested without `vscode`.
+ *
+ * The result must use the indexer's path keys, or the webview cannot match a
+ * changed file to its node: porcelain paths are repository-relative, so they
+ * are re-rooted on the workspace and normalized. `--untracked-files=all` lists
+ * the files inside a new folder instead of the bare folder.
  */
 function gitStatusFallback(): Promise<string[]> {
     const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!cwd) return Promise.resolve([]);
-    return new Promise((resolve) => {
-        execFile('git', ['status', '--porcelain'], { cwd }, (err, stdout) => {
-            resolve(err ? [] : parsePorcelain(stdout));
-        });
+    const run = (args: string[]) => new Promise<string | undefined>((resolve) => {
+        execFile('git', args, { cwd, maxBuffer: 16 * 1024 * 1024 }, (err, stdout) => resolve(err ? undefined : stdout));
     });
+    return (async () => {
+        const prefix = await run(['rev-parse', '--show-prefix']);
+        if (prefix === undefined) return [];
+        const status = await run(['status', '--porcelain', '-z', '--untracked-files=all']);
+        if (status === undefined) return [];
+        return toWorkspacePaths(cwd, prefix.trim(), parsePorcelain(status)).map(normalizePath);
+    })();
 }
 
 export function watchGitState(onChange: () => void): vscode.Disposable {

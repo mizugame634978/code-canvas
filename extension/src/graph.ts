@@ -36,7 +36,7 @@ const MAX_PACKAGE_TARGETS = 8;
 const MAX_NODE_SYMBOLS = 64;
 
 // Normalize paths to a canonical absolute form used for all map/set keys
-function normalizePath(p: string): string {
+export function normalizePath(p: string): string {
     try {
         let out = path.resolve(p);
         if (process.platform === 'win32') {
