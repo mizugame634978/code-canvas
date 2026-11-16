@@ -32,7 +32,7 @@ VS Code 拡張「Code Canvas」の fork。ワークスペースの import 関係
 | `tools/lib/indexer.mjs` | `extension/src/graph.ts` を esbuild でバンドルし、スタブで動かす（`buildGraph(root)`） |
 | `tools/snapshot.mjs` | 上のグラフをヘッドレス Chromium の webview に流し込み、撮影する |
 | `webview/vite.config.ts` の `test.alias` | テストでも `vscode` をスタブに差し替える。これで `graph.ts` を丸ごとテストできる |
-| `fixtures/<名前>/` | 解析対象のサンプルプロジェクト（`python-basic`、`ts-basic`）。期待する線を `fixtures-<言語>.test.ts` で固定する。各 README に含めた書き方の一覧がある |
+| `fixtures/<名前>/` | 解析対象のサンプルプロジェクト（`python-basic`、`ts-basic`、`csharp-wpf`）。期待する線を `fixtures-<言語>.test.ts` で固定する。各 README に含めた書き方の一覧がある |
 | `webview/src/__tests__/fixtureGraph.ts` | fixture を解析して線の一覧を返すテスト用の補助関数 |
 
 ## バグを直す手順
@@ -57,6 +57,9 @@ VS Code 拡張「Code Canvas」の fork。ワークスペースの import 関係
 - **`fs.existsSync` はフォルダでも true**。import 先の候補を調べるときはファイルかどうか（`isFile`）で判定する（`./components` がフォルダそのものに解決されていた）
 - **tsconfig は JSON ではない**。コメント・末尾カンマ・`extends` がある。読み込みは `aliases.ts` の `loadAliasConfig` を使う
 - **import を正規表現で探すときはコメントを先に消す**（`blankJsComments`）。行番号を保つため、削除ではなく空白に置き換える
+- **C# は `using` ではなく型の名前で線を引く**（`csResolve.ts`）。`using` は名前空間しか分からず、同じ名前空間の参照は `using` 自体が無いため
+- **既定の除外パターン（`extension/package.json` の `codeCanvas.excludeGlobs`）は言語ごとのビルド出力を入れる**。.NET の `obj/` が抜けていて生成ファイルでキャンバスが埋まっていた。`bin/` は Node の CLI のソース置き場でもあるので `bin/Debug|Release/` だけを除外している
+- サンプルだけでなく、このPCの実プロジェクト（`../PrismHandsOn` などの WPF）に `node tools/edges.mjs` を当てると、サンプルで想定していない問題が見つかる（読むだけで書き換えない）
 - import 文の行番号（`ImportSpec.line`）は **0 始まり**（VS Code の Position と同じ）
 - **インストール用の `.vsix` は拡張機能 ID を本家と変えている**。同じ ID だと、マーケットプレイスの本家版の自動更新で fork が上書きされる。`extension/package.json` は書き換えず、`tools/.cache/vsix` のコピーだけを変える
 - `webview` をビルドすると `extension/media/` は丸ごと消えて作り直される。手で編集しない
