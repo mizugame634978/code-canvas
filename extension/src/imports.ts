@@ -186,7 +186,8 @@ export function parseJsTsImports(code: string): ImportSpec[] {
 }
 
 const RE_PY_IMPORT = /^[ \t]*import\s+([^\n#]+)/gm;
-const RE_PY_FROM = /^[ \t]*from\s+([.\w]+)\s+import\s+([^\n#]+)/gm;
+// The parenthesised form may span lines (and carry comments), so it is taken whole up to `)`.
+const RE_PY_FROM = /^[ \t]*from\s+([.\w]+)\s+import\s+(\([^)]*\)|[^\n#]+)/gm;
 
 // ---------------------------------------------------------------------------
 // Go
@@ -319,7 +320,7 @@ export function parseCsImports(code: string): ImportSpec[] {
 
 /**
  * Scan Python source. Covers `import x`, `import x as y`, `import a, b`,
- * `from x import a, b as c` and the parenthesised multi-line form's first line.
+ * `from x import a, b as c` and the parenthesised multi-line form.
  */
 export function parsePyImports(code: string): ImportSpec[] {
     const acc = collect();
@@ -344,7 +345,7 @@ export function parsePyImports(code: string): ImportSpec[] {
         while ((m = RE_PY_FROM.exec(code))) {
             const line = lineAt(starts, m.index);
             const bindings: ImportBinding[] = [];
-            for (const rawPart of m[2].replace(/[()]/g, '').split(',')) {
+            for (const rawPart of m[2].replace(/#[^\n]*/g, '').replace(/[()]/g, '').split(',')) {
                 const part = rawPart.trim();
                 if (!part) continue;
                 if (part === '*') { bindings.push({ name: '*', kind: 'namespace' }); continue; }

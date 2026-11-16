@@ -9,6 +9,7 @@ import {
     type ImportBinding, type ImportSpec,
 } from './imports';
 import { aliasCandidates, loadAliases, type AliasMap } from './aliases';
+import { makeExactCaseExists, resolvePyImport } from './pyResolve';
 import { describeFile, describeFolder, extractDocSummary, extractExportedSymbols, type FileImportDetail, type SourceLang } from './describe';
 
 const JS_GLOB = ['**/*.{js,jsx,ts,tsx}'];
@@ -87,6 +88,7 @@ export async function buildIndex(root: string): Promise<Index> {
     // candidate paths per import) so we never stat the same path twice. Scoped to
     // this build so a later reload re-probes fresh (P2-5).
     const existsCache = new Map<string, boolean>();
+    const pyExists = makeExactCaseExists(root, p => existsCached(p, existsCache));
 
     // P2-5: read files asynchronously with bounded concurrency instead of a
     // sequential wall of blocking readFileSync calls.
@@ -129,18 +131,25 @@ export async function buildIndex(root: string): Promise<Index> {
             goModules, goByDir, javaTypeByFqn, javaPackageFiles, csNamespaceFiles,
         };
         for (const { spec, line, bindings } of specs) {
-            const resolved = resolveSpec(fileLang, { ...ctx, spec });
-            if (!resolved) continue;
-            const list = Array.isArray(resolved) ? resolved : [resolved];
+            // Python splits one statement across files (`from pkg import submodule, func`),
+            // so it hands back the bindings per target; every other language shares them.
+            let list: { file: string; bindings: ImportBinding[] }[];
+            if (fileLang === 'py') {
+                list = resolvePyImport(root, f, spec, bindings, pyExists);
+            } else {
+                const resolved = resolveSpec(fileLang, { ...ctx, spec });
+                if (!resolved) continue;
+                list = (Array.isArray(resolved) ? resolved : [resolved]).map(file => ({ file, bindings }));
+            }
             for (const r of list) {
-                const rNorm = normalizePath(r);
+                const rNorm = normalizePath(r.file);
                 if (rNorm === f) continue;
                 targets.add(rNorm);
                 const arr = lineMap.get(rNorm) || [];
                 arr.push(line);
                 lineMap.set(rNorm, arr);
                 const acc = bindingMap.get(rNorm) || [];
-                for (const b of bindings) acc.push({ ...b, line });
+                for (const b of r.bindings) acc.push({ ...b, line });
                 bindingMap.set(rNorm, acc);
             }
         }
@@ -590,7 +599,6 @@ type ResolveContext = {
 
 function resolveSpec(lang: SourceLang, ctx: ResolveContext): string | string[] | undefined {
     switch (lang) {
-        case 'py': return resolvePy(ctx.root, ctx.spec, ctx.existsCache);
         case 'go': return resolveGo(ctx);
         case 'rs': return resolveRust(ctx);
         case 'java': return resolveJava(ctx);
@@ -615,15 +623,6 @@ function resolveJsTs(fromFile: string, spec: string, exists?: Map<string, boolea
         }
     }
     return undefined;
-}
-
-function resolvePy(root: string, mod: string, exists?: Map<string, boolean>): string | undefined {
-    const parts = mod.split('.');
-    const candidates = [
-        path.resolve(root, ...parts) + '.py',
-        path.resolve(root, ...parts, '__init__.py')
-    ];
-    for (const p of candidates) if (existsCached(p, exists)) return normalizePath(p);
 }
 
 type GoModule = { module: string; dir: string };
