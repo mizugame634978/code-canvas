@@ -17,6 +17,13 @@ C# は `using` で**名前空間**を取り込むので、`using` の行だけ�
 3. `MyApp.Services.SettingsStore` のような名前空間付きの書き方、`using M = ...;` の別名
 
 コメント・文字列・`using` の行・型の宣言そのもの（`class Order`）は数えない。
+
+XAML は `extension/src/xamlResolve.ts` で次を線にする。
+- `x:Class` → コードビハインド（そのクラスを宣言している `.cs`）
+- `xmlns:vm="clr-namespace:..."`（または `using:`）で宣言した接頭辞の型（`<vm:MainViewModel/>`、`{x:Type vm:Foo}` など）
+- `StartupUri` / `Source` が指す `.xaml`（相対パス、`/` 始まりや `pack://` は `.csproj` のあるフォルダが基準）
+
+`{Binding Foo}` のようなバインディングは実行時に決まるプロパティ名なので、線にしない。
 字面だけで判断するので、型と同じ名前のプロパティやローカル変数があると、型への線として数えることがある。
 
 ## 含めている書き方
@@ -31,4 +38,6 @@ C# は `using` で**名前空間**を取り込むので、`using` の行だけ�
 | `Models/Order.cs` + `Order.Validation.cs` | `partial class Order` | partial は宣言している全ファイルに線を出す |
 | `Services/OrderService.cs` | `using MyApp.Models;` で `Customer` は使わない | **使っていない型には線を出さない** |
 | `obj/…/MainWindow.g.cs`、`bin/Debug/…/Leftover.cs` | ビルド生成物の代わり | **`obj/` と `bin/Debug|Release/` は解析しない** |
-| `*.xaml` | XAML | 今は解析の対象外（今後対応する） |
+| `App.xaml` | `x:Class`、`StartupUri`、`ResourceDictionary Source` | コードビハインド、起動画面、リソースへの線 |
+| `Views/MainWindow.xaml` | `<vm:MainViewModel />`、`{x:Type vm:SettingsViewModel}` | XAML から ViewModel への線 |
+| `Views/MainWindow.xaml` | `<!-- <m:Customer /> -->` | コメント内のマークアップは数えない |

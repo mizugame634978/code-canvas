@@ -13,6 +13,10 @@ beforeAll(async () => {
 describe('fixtures/csharp-wpf', () => {
     it('draws an edge per used type, and none for an unused using', () => {
         expect(result.edges).toEqual([
+            // XAML: x:Class -> code-behind, StartupUri / Source -> XAML, prefix:Type -> C# type.
+            'App.xaml <- App.xaml.cs [App]',
+            'App.xaml <- Themes/Colors.xaml [Colors.xaml]',
+            'App.xaml <- Views/MainWindow.xaml [MainWindow.xaml]',
             'Models/Order.cs <- Models/Customer.cs [Customer]',
             // A partial class lives in every file that declares a part of it.
             'Services/OrderService.cs <- Models/Order.Validation.cs [Order]',
@@ -23,14 +27,13 @@ describe('fixtures/csharp-wpf', () => {
             'ViewModels/MainViewModel.cs <- ViewModels/ViewModelBase.cs [ViewModelBase]',
             'ViewModels/SettingsViewModel.cs <- Services/SettingsStore.cs [SettingsStore]',
             'ViewModels/SettingsViewModel.cs <- ViewModels/ViewModelBase.cs [ViewModelBase]',
+            'Views/MainWindow.xaml <- ViewModels/MainViewModel.cs [MainViewModel]',
+            'Views/MainWindow.xaml <- ViewModels/SettingsViewModel.cs [SettingsViewModel]',
+            'Views/MainWindow.xaml <- Views/MainWindow.xaml.cs [MainWindow]',
         ]);
     });
 
     it('ignores type names in comments, strings and using directives', () => {
-        expect(result.isolated).toEqual([
-            'App.xaml.cs',
-            'GlobalUsings.cs',
-            'Views/MainWindow.xaml.cs',
-        ]);
+        expect(result.isolated).toEqual(['GlobalUsings.cs']);
     });
 });

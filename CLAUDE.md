@@ -57,7 +57,8 @@ VS Code 拡張「Code Canvas」の fork。ワークスペースの import 関係
 - **`fs.existsSync` はフォルダでも true**。import 先の候補を調べるときはファイルかどうか（`isFile`）で判定する（`./components` がフォルダそのものに解決されていた）
 - **tsconfig は JSON ではない**。コメント・末尾カンマ・`extends` がある。読み込みは `aliases.ts` の `loadAliasConfig` を使う
 - **import を正規表現で探すときはコメントを先に消す**（`blankJsComments`）。行番号を保つため、削除ではなく空白に置き換える
-- **C# は `using` ではなく型の名前で線を引く**（`csResolve.ts`）。`using` は名前空間しか分からず、同じ名前空間の参照は `using` 自体が無いため
+- **C# は `using` ではなく型の名前で線を引く**（`csResolve.ts`）。`using` は名前空間しか分からず、同じ名前空間の参照は `using` 自体が無いため。XAML（`xamlResolve.ts`）も同じ型の一覧を使う
+- **新しい言語・ファイル種別を足すときの触る場所**: `graph.ts`（GLOB・`EXT_LANG`・`parseForLang`・解決処理）、`describe.ts`（`SourceLang`・説明文・公開シンボル・`LANG_NAME`）、`webview/src/code/highlight.ts`（色分け）
 - **既定の除外パターン（`extension/package.json` の `codeCanvas.excludeGlobs`）は言語ごとのビルド出力を入れる**。.NET の `obj/` が抜けていて生成ファイルでキャンバスが埋まっていた。`bin/` は Node の CLI のソース置き場でもあるので `bin/Debug|Release/` だけを除外している
 - サンプルだけでなく、このPCの実プロジェクト（`../PrismHandsOn` などの WPF）に `node tools/edges.mjs` を当てると、サンプルで想定していない問題が見つかる（読むだけで書き換えない）
 - import 文の行番号（`ImportSpec.line`）は **0 始まり**（VS Code の Position と同じ）
