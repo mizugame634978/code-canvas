@@ -7,6 +7,7 @@ extension that renders a workspace as an interactive dependency graph.
 
 | Document | What it covers |
 | --- | --- |
+| [00 — 開発の原則](00-principles.md) | この fork の目的・優先順位・進め方（日本語）。**最初に読む** |
 | [01 — Architecture](01-architecture.md) | Process model, the two packages, message protocol, data flow end to end |
 | [02 — Indexing & import resolution](02-indexing.md) | File discovery, import/export parsing, module resolution, subgraph selection |
 | [03 — Graph model & projection](03-graph-model.md) | The collapse-first model, edge projection, expand/collapse semantics |

@@ -3,8 +3,9 @@
 VS Code 拡張「Code Canvas」の fork。ワークスペースの import 関係をキャンバスに描く。
 **AI ファーストで開発する。** AI が「再現 → 修正 → 検証（画面確認まで）」を自分で回せることを優先する。
 
-- 設計資料: `__doc__/`（英語・本家由来）。まず `__doc__/01-architecture.md` を読む
-- リモート: `origin` = `mizugame634978/code-canvas`（fork）、`upstream` = `Ahsaniat/code-canvas`（本家）
+- **最初に `__doc__/00-principles.md`（開発の原則）を読む。** 判断に迷ったらそこに従い、書いていないことはユーザーに聞く
+- 設計資料: `__doc__/`（01〜10 は英語・本家由来）。構造は `__doc__/01-architecture.md` から読む
+- リモート: `origin` = `mizugame634978/code-canvas`（fork）、`upstream` = `Ahsaniat/code-canvas`（本家）。本家からは独立して育てる（原則 6）
 - 作業はブランチで行い、`master` に直接コミットしない
 
 ## 検証コマンド（人に確認を頼む前に必ず回す）
@@ -68,6 +69,6 @@ VS Code 拡張「Code Canvas」の fork。ワークスペースの import 関係
 
 ## コードの書き方
 
-- `extension/` と `webview/` のソースは本家に合わせて**英語のコメント**で書く（本家へ PR を出せるようにするため）
-- `tools/`、`CLAUDE.md`、fixture の説明は日本語
+- コメントは、新しく書く部分・書き換える部分は**日本語**。既存の英語コメントは、そのコードに手を入れるときに必要なら書き換える（一括翻訳はしない。原則 7）
+- 文書・fixture の説明・PR の説明は日本語。コミットメッセージは英語の要約 + 本文
 - vscode に依存しない処理は別ファイルに切り出してテストできるようにする（例: `aliases.ts`、`pyResolve.ts`）
