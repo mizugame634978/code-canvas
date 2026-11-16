@@ -49,6 +49,8 @@ VS Code 拡張「Code Canvas」の fork。ワークスペースの import 関係
 - **webview は `onlyRenderVisibleElements`**。画面外のノードは DOM に無く、大きさも未計測。DOM の要素数は「表示中の数」でしかない。
   全体表示（fitView）は1回では全ノードを含まないので、`snapshot.mjs` は表示範囲が変わらなくなるまで繰り返している
 - **esbuild でバンドルしたファイル内の `__dirname` はバンドル先**（`tools/.cache`）になる。スタブは `CC_REPO_ROOT` 環境変数でリポジトリの場所を受け取る
+- **拡張機能内でファイルパスを受け渡すときは `normalizePath`（`graph.ts`）の形にそろえる**。webview はパスの文字列が完全一致しないとノードを見つけられない
+- **`git status --porcelain` は `-z` なしだと日本語などのパスを `"\346\227..."` とエスケープする**。パスはリポジトリのルート基準で、未追跡のフォルダはフォルダ名だけになる（`--untracked-files=all` で中身が出る）
 - import 文の行番号（`ImportSpec.line`）は **0 始まり**（VS Code の Position と同じ）
 - `webview` をビルドすると `extension/media/` は丸ごと消えて作り直される。手で編集しない
 - vitest の中の `console.log` は出力が拾いにくい。調査用の出力はファイルに書き出す
