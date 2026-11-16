@@ -17,6 +17,8 @@ VS Code 拡張「Code Canvas」の fork。ワークスペースの import 関係
 
 - スナップショットは**ビルド済みの** webview（`extension/media`）を使う。webview を直したら先に `npm run build`
 - 既定の保存先は `tools/.cache/snapshots/`（git 管理外）。出力にブラウザのエラー・警告も表示される
+- CI（`.github/workflows/ci.yml`）は Ubuntu と Windows の両方で型チェック・テスト・ビルドを行う。PR を出したら `gh pr checks` で結果を確認する
+  （このPCの `gh` は PATH に無いことがある。`"/c/Program Files/GitHub CLI/gh.exe"` で呼ぶ）
 - 人の確認が必要なのは VS Code 本体との連携だけ（ファイルを開く、保存で再描画、LSP のシンボル、設定画面）。
   それ以外は AI がテストとスナップショットで確かめてから報告する
 
