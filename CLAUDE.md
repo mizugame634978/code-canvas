@@ -64,6 +64,7 @@ VS Code 拡張「Code Canvas」の fork。ワークスペースの import 関係
 - サンプルだけでなく、このPCの実プロジェクト（`../PrismHandsOn` などの WPF）に `node tools/edges.mjs` を当てると、サンプルで想定していない問題が見つかる（読むだけで書き換えない）
 - import 文の行番号（`ImportSpec.line`）は **0 始まり**（VS Code の Position と同じ）
 - **拡張機能 ID は本家（`ahsaniat.code-canvas-oss`）と変えてある**（`extension/package.json`）。同じ ID に戻すと、マーケットプレイスの本家版の自動更新で上書きされる。ID を変えたら、古い ID を `tools/package-local.mjs` の `OLD_IDS` に足す（残っているとコマンドが二重に登録される）
+- **`package.json` の `name` や依存を変えたら `npm install` で `package-lock.json` も更新してコミットする**。CI は `npm ci` なので、ずれていると Install の段階で落ちる。手元でも `npm ci` で確かめられる
 - `webview` をビルドすると `extension/media/` は丸ごと消えて作り直される。手で編集しない
 - vitest の中の `console.log` は出力が拾いにくい。調査用の出力はファイルに書き出す
 
