@@ -1,31 +1,18 @@
 <h1 align="center">Code Canvas - Visual Code Graph for VS Code</h1>
 
-<p align="center">
-  <a href="https://marketplace.visualstudio.com/items?itemName=ahsaniat.code-canvas-oss"><img src="https://img.shields.io/badge/VS%20Marketplace-install-blue" alt="VS Marketplace"></a>
-  <a href="https://open-vsx.org/extension/ahsaniat/code-canvas-oss"><img src="https://img.shields.io/open-vsx/v/ahsaniat/code-canvas-oss?label=open%20vsx" alt="Open VSX"></a>
-  <a href="https://open-vsx.org/extension/ahsaniat/code-canvas-oss"><img src="https://img.shields.io/open-vsx/dt/ahsaniat/code-canvas-oss?label=downloads" alt="Open VSX downloads"></a>
-  <a href="https://github.com/Ahsaniat/code-canvas/releases"><img src="https://img.shields.io/github/v/release/Ahsaniat/code-canvas?label=release" alt="GitHub release"></a>
-</p>
+> このリポジトリは [Ahsaniat/code-canvas](https://github.com/Ahsaniat/code-canvas) から独立して開発している fork。
+> 拡張機能 ID は `mizugame634978.code-canvas`（表示名「Code Canvas」）。開発の原則は [`__doc__/00-principles.md`](__doc__/00-principles.md)。
 
-## Install
+## インストール
 
-**From the VS Code Marketplace** (recommended):
+マーケットプレイスには公開していない。ソースからビルドしてインストールする（Node.js 20.19 以上）。
 
 ```bash
-code --install-extension ahsaniat.code-canvas-oss
+npm install
+npm run install:local   # ビルド → .vsix 作成 → VS Code にインストール
 ```
 
-Or search **Code Canvas OSS** in the Extensions view, or open the
-[Marketplace page](https://marketplace.visualstudio.com/items?itemName=ahsaniat.code-canvas-oss).
-
-**From GitHub Releases:** download the `.vsix` from the
-[latest release](https://github.com/Ahsaniat/code-canvas/releases) and install it:
-
-```bash
-code --install-extension code-canvas-oss-<version>.vsix
-```
-
-**From source:** see [Install and Build](#install-and-build-from-source) below.
+インストール後、VS Code で「Developer: Reload Window」を実行し、コマンドパレットから「Code Canvas: Open」を開く。
 
 ## Overview
 Code Canvas is a Visual Studio Code extension that turns your workspace into an interactive dependency graph. It indexes your JavaScript/TypeScript and Python files, resolves their imports, and renders the result as a canvas of folders and files connected by circuit-style wires.
@@ -106,12 +93,12 @@ Create a `.vsix` package:
 ```bash
 npm run package
 ```
-This generates `extension/code-canvas-oss-<version>.vsix` (for example
-`code-canvas-oss-0.2.0.vsix`).
+This generates `extension/code-canvas-<version>.vsix` (for example
+`code-canvas-0.3.1.vsix`).
 
 Install the VSIX locally:
 ```bash
-code --install-extension extension/code-canvas-oss-<version>.vsix
+code --install-extension extension/code-canvas-<version>.vsix
 ```
 Or via VS Code: Extensions view → “…” menu → Install from VSIX…
 

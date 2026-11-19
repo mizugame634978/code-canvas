@@ -58,7 +58,7 @@ jobs:
         run: |
           cd extension
           npx vsce package --no-dependencies
-          VSIX="code-canvas-oss-$(node -p "require('./package.json').version").vsix"
+          VSIX="code-canvas-$(node -p "require('./package.json').version").vsix"
           test -f "$VSIX"
           echo "vsix=$VSIX" >> "$GITHUB_OUTPUT"
           echo "Packaged $VSIX"

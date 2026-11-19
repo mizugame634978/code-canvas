@@ -1,8 +1,8 @@
-# Code Canvas OSS
+# Code Canvas
 
 Interactive canvas for your codebase: a file and folder graph with inline code previews, search, descriptions and resizable nodes.
 
-An actively maintained fork of [waLLxAck/code-canvas](https://github.com/waLLxAck/code-canvas).
+[Ahsaniat/code-canvas](https://github.com/Ahsaniat/code-canvas)（元は [waLLxAck/code-canvas](https://github.com/waLLxAck/code-canvas)）から独立して開発している fork。
 
 ## Features
 
