@@ -16,7 +16,7 @@ VS Code 拡張「Code Canvas」の fork。ワークスペースの import 関係
 | `npm test` | vitest。`webview/src/__tests__/` に extension 側のテストも置いている |
 | `node tools/edges.mjs <フォルダ> [--isolated]` | 解析結果の線を1行1本で一覧表示する。画面を撮るより速く確実。fixture のテストと同じ形式 |
 | `npm run snapshot -- <フォルダ> [--reveal all\|<相対パス,...>] [--out <png>]` | キャンバスのスクリーンショットを撮る。結果の PNG は Read ツールで見る |
-| `npm run install:local` | ビルド → `.vsix` 作成 → 普段の VS Code にインストール（ID は `local.code-canvas-fork`）。`package:local` は `.vsix` を作るだけ |
+| `npm run install:local` | ビルド → `.vsix` 作成 → 普段の VS Code にインストール（ID は `mizugame634978.code-canvas`）。以前の ID（`local.code-canvas-fork`）が残っていれば削除する。`package:local` は `.vsix` を作るだけ |
 
 - スナップショットは**ビルド済みの** webview（`extension/media`）を使う。webview を直したら先に `npm run build`
 - 既定の保存先は `tools/.cache/snapshots/`（git 管理外）。出力にブラウザのエラー・警告も表示される
@@ -63,7 +63,8 @@ VS Code 拡張「Code Canvas」の fork。ワークスペースの import 関係
 - **既定の除外パターン（`extension/package.json` の `codeCanvas.excludeGlobs`）は言語ごとのビルド出力を入れる**。.NET の `obj/` が抜けていて生成ファイルでキャンバスが埋まっていた。`bin/` は Node の CLI のソース置き場でもあるので `bin/Debug|Release/` だけを除外している
 - サンプルだけでなく、このPCの実プロジェクト（`../PrismHandsOn` などの WPF）に `node tools/edges.mjs` を当てると、サンプルで想定していない問題が見つかる（読むだけで書き換えない）
 - import 文の行番号（`ImportSpec.line`）は **0 始まり**（VS Code の Position と同じ）
-- **インストール用の `.vsix` は拡張機能 ID を本家と変えている**。同じ ID だと、マーケットプレイスの本家版の自動更新で fork が上書きされる。`extension/package.json` は書き換えず、`tools/.cache/vsix` のコピーだけを変える
+- **拡張機能 ID は本家（`ahsaniat.code-canvas-oss`）と変えてある**（`extension/package.json`）。同じ ID に戻すと、マーケットプレイスの本家版の自動更新で上書きされる。ID を変えたら、古い ID を `tools/package-local.mjs` の `OLD_IDS` に足す（残っているとコマンドが二重に登録される）
+- **`package.json` の `name` や依存を変えたら `npm install` で `package-lock.json` も更新してコミットする**。CI は `npm ci` なので、ずれていると Install の段階で落ちる。手元でも `npm ci` で確かめられる
 - `webview` をビルドすると `extension/media/` は丸ごと消えて作り直される。手で編集しない
 - vitest の中の `console.log` は出力が拾いにくい。調査用の出力はファイルに書き出す
 
